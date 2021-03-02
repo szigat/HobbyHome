@@ -1,0 +1,185 @@
+﻿using System;
+using System.Linq;
+using System.Text;
+using System.Threading.Tasks;
+
+using Windows.Devices.Bluetooth;
+using Windows.Devices.Bluetooth.Advertisement;
+using Windows.Devices.Enumeration;
+using Windows.Storage.Streams;
+
+namespace XiaomiTemperatureCollector
+{
+    class Program
+    {
+        static async Task Main(string[] args)
+        {
+            var context = await TemperatureDevice.FindDevice(181149783211336);
+            await context.CollectTemperatureAndHunidityData();
+            DeviceData data = await context.GetData();
+
+            Console.WriteLine(data.Temperature);
+
+            //var device = BluetoothLEDevice.f//.GetDeviceSelectorFromDeviceName("LYWSD03MMC");
+            //var result = new BluetoothLEAdvertisementWatcher(new BluetoothLEAdvertisementFilter()
+            //{
+
+            //});
+            //result.
+            //result.Received += Result_Received;
+            //result.Start();
+
+            //Console.ReadKey();
+            //result.Stop();
+            //string[] requestedProperties = { "System.Devices.Aep.DeviceAddress", "System.Devices.Aep.IsConnected" };
+            //DeviceWatcher deviceWatcher =
+            //DeviceInformation.CreateWatcher(
+            //        BluetoothLEDevice.GetDeviceSelectorFromBluetoothAddress(181149783211336),
+            //        requestedProperties);
+
+            //deviceWatcher.Added += DeviceWatcher_Added;
+            //deviceWatcher.Removed += DeviceWatcher_Removed;
+            //deviceWatcher.Updated += DeviceWatcher_Updated;
+            //deviceWatcher.EnumerationCompleted += DeviceWatcher_EnumerationCompleted;
+            //deviceWatcher.Start();
+
+            //while(!founded) { }
+            //deviceWatcher.Stop();
+
+            //BluetoothLEDevice device = await BluetoothLEDevice.FromBluetoothAddressAsync(181149783211336);
+
+            //try
+            //{
+            //    // var gattService = await device.GetGattServicesAsync();
+
+            //    //                device.GetGattService
+            //    var serviceResult = await device.GetGattServicesForUuidAsync(new Guid("ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6"));
+            //    var services = serviceResult.Services;
+
+            //    foreach (var service in services)
+            //    {
+
+            //        if (service != null && service.Uuid == new Guid("ebe0ccb0-7a0a-4b0c-8a1a-6ff2997da3a6"))
+            //        {
+            //            Console.WriteLine(service.Uuid);
+            //            var characteristics = await service.GetCharacteristicsAsync();
+
+            //            foreach (var item in characteristics.Characteristics)
+            //            {
+            //                //Console.WriteLine(item.UserDescription);
+            //                var desc = await item.GetDescriptorsAsync();
+            //                //Console.WriteLine(item.Uuid);
+            //                //foreach (var d in desc.Descriptors)
+            //                //{
+            //                //    var value1 = await d.ReadValueAsync();
+            //                //    var reader = DataReader.FromBuffer(value1.Value);
+            //                //    byte[] input = new byte[reader.UnconsumedBufferLength];
+            //                //    reader.ReadBytes(input);
+            //                //    Console.WriteLine($"  Descriptor uuid: {d.Uuid} user desc: {item.UserDescription} value: { System.Text.Encoding.UTF8.GetString(input)}");
+
+            //                //}
+
+            //                if (item.Uuid == new Guid("ebe0ccc1-7a0a-4b0c-8a1a-6ff2997da3a6"))
+            //                {
+            //                    item.ValueChanged += Item_ValueChanged;
+            //                }
+
+            //                //var value = await item.ReadValueAsync();
+            //                //ConsoleWriting(value);
+            //            }
+
+
+            //        }
+            //    }
+
+            //    Console.ReadKey();
+            //}
+            //finally
+            //{
+            //    device.Dispose();
+            //}
+
+        }
+
+        private static void DeviceWatcher_Updated(DeviceWatcher sender, DeviceInformationUpdate args)
+        {
+            //throw new NotImplementedException();
+        }
+
+        private static void DeviceWatcher_Removed(DeviceWatcher sender, DeviceInformationUpdate args)
+        {
+            //throw new NotImplementedException();
+        }
+
+        private static void DeviceWatcher_Added(DeviceWatcher sender, DeviceInformation args)
+        {
+            //throw new NotImplementedException();
+        }
+
+        //private static void DeviceWatcher_EnumerationCompleted(DeviceWatcher sender, object args)
+        //{
+        //    founded = true;
+        //}
+
+        private static void ConsoleWriting(Windows.Devices.Bluetooth.GenericAttributeProfile.GattReadResult value)
+        {
+            var reader = DataReader.FromBuffer(value.Value);
+            byte[] input = new byte[reader.UnconsumedBufferLength];
+            reader.ReadBytes(input);
+            string write = System.Text.Encoding.UTF8.GetString(input);
+            write += " / ";
+            foreach (var element in input)
+            {
+                write += element;
+            }
+
+
+
+            write += "\r\n";
+            StringBuilder sb = new StringBuilder();
+            foreach (var element2 in input)
+            {
+                sb.AppendFormat("{0:x2}", element2);
+            }
+            write += sb.ToString();
+            //Array.Reverse(input);
+            try
+            {
+                write += " / " + BitConverter.ToInt32(input);
+                if (input[13] == 0x04)
+                {
+                    var e = input[16];
+                    Console.WriteLine($"------- temp {BitConverter.ToInt16(new byte[] { e, input[17] })}");
+                }
+            }
+            catch { }
+            Console.WriteLine(write);
+        }
+
+        private static void Item_ValueChanged(Windows.Devices.Bluetooth.GenericAttributeProfile.GattCharacteristic sender, Windows.Devices.Bluetooth.GenericAttributeProfile.GattValueChangedEventArgs args)
+        {
+            var reader = DataReader.FromBuffer(args.CharacteristicValue);
+            byte[] input = new byte[reader.UnconsumedBufferLength];
+            reader.ReadBytes(input);
+
+            Console.WriteLine($"temp: {BitConverter.ToInt16(input.Take(2).ToArray()) * 0.01}");
+            Console.WriteLine($"humidity: {input[2]}");
+
+        }
+
+        private async static void Result_Received(BluetoothLEAdvertisementWatcher sender, BluetoothLEAdvertisementReceivedEventArgs args)
+        {
+            var device = await BluetoothLEDevice.FromBluetoothAddressAsync(args.BluetoothAddress);
+            if (device != null && device.DeviceId.Contains("A4:C1", StringComparison.OrdinalIgnoreCase))
+            {
+                var gatt = await device.GetGattServicesAsync();
+                if (gatt.Status == Windows.Devices.Bluetooth.GenericAttributeProfile.GattCommunicationStatus.Success)
+                {
+                    Console.WriteLine($"{device.Name} : {device.DeviceId}");
+                }
+            }
+
+
+        }
+    }
+}
